@@ -1,6 +1,7 @@
 #include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 #define STB_IMAGE_IMPLEMENTATION
 #include "third-party/stb_image.h"
@@ -81,6 +82,32 @@ static void best(unsigned char r, unsigned char g, unsigned char b,
     *mm = bx->m;
 }
 
+static int lower(int c)
+{
+    if (c >= 'A' && c <= 'Z')
+        return c + ('a' - 'A');
+    return c;
+}
+
+static int ends_with(const char *s, const char *suffix)
+{
+    size_t slen, suffix_len;
+
+    slen = strlen(s);
+    suffix_len = strlen(suffix);
+    if (suffix_len > slen)
+        return 0;
+
+    s += slen - suffix_len;
+    while (*suffix) {
+        if (lower((unsigned char)*s) != lower((unsigned char)*suffix))
+            return 0;
+        s++;
+        suffix++;
+    }
+    return 1;
+}
+
 int main(int argc, char **argv)
 {
     int w, h, n, x, y, rc, found;
@@ -98,7 +125,7 @@ int main(int argc, char **argv)
     vals = NULL;
 
     if (argc != 3) {
-        fprintf(stderr, "usage: %s image-in.jpg image-out.jpg\n", argv[0]);
+        fprintf(stderr, "usage: %s image-in image-out.{jpg,jpeg,png}\n", argv[0]);
         goto done;
     }
 
@@ -143,9 +170,19 @@ int main(int argc, char **argv)
         }
     }
 
-    /* Write the dithered RGB image as a JPG. */
-    if (!stbi_write_jpg(argv[2], w, h, 3, out, 95)) {
-        fprintf(stderr, "%s: write failed\n", argv[2]);
+    /* Write the dithered RGB image based on the output extension. */
+    if (ends_with(argv[2], ".png")) {
+        if (!stbi_write_png(argv[2], w, h, 3, out, w * 3)) {
+            fprintf(stderr, "%s: write failed\n", argv[2]);
+            goto done;
+        }
+    } else if (ends_with(argv[2], ".jpg") || ends_with(argv[2], ".jpeg")) {
+        if (!stbi_write_jpg(argv[2], w, h, 3, out, 95)) {
+            fprintf(stderr, "%s: write failed\n", argv[2]);
+            goto done;
+        }
+    } else {
+        fprintf(stderr, "%s: unsupported output format (use .jpg, .jpeg, or .png)\n", argv[2]);
         goto done;
     }
 

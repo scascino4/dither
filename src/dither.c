@@ -87,7 +87,6 @@ static void init_color_tables(void)
                 r = pal_lin[c0][0] * f + pal_lin[c1][0] * (1.0 - f);
                 g = pal_lin[c0][1] * f + pal_lin[c1][1] * (1.0 - f);
                 b = pal_lin[c0][2] * f + pal_lin[c1][2] * (1.0 - f);
-
                 x = mixes + nmix++;
                 x->c0 = (unsigned char)c0;
                 x->c1 = (unsigned char)c1;
@@ -99,12 +98,12 @@ static void init_color_tables(void)
 }
 
 /*
-* Match colors in a more perceptual space than byte sRGB.  sRGB values are
-* gamma-encoded, so arithmetic on them does not correspond to physical light;
-* first convert to linear RGB before averaging palette colors.  Then compare
-* input colors and palette mixtures in OKLab, where Euclidean distance better
-* tracks perceived color difference than raw RGB distance.
-*/
+ * Match colors in a more perceptual space than byte sRGB.  sRGB values are
+ * gamma-encoded, so arithmetic on them does not correspond to physical light;
+ * first convert to linear RGB before averaging palette colors.  Then compare
+ * input colors and palette mixtures in OKLab, where Euclidean distance better
+ * tracks perceived color difference than raw RGB distance.
+ */
 static void best(unsigned char r, unsigned char g, unsigned char b,
                  unsigned char *cc0, unsigned char *cc1, unsigned char *mm)
 {
@@ -151,7 +150,6 @@ static int ends_with(const char *s, const char *suffix)
 
     if (suffix_len > slen)
         return 0;
-
     s += slen - suffix_len;
     while (*suffix) {
         if (lower((unsigned char)*s) != lower((unsigned char)*suffix))
@@ -206,7 +204,7 @@ int main(int argc, char **argv)
     mask = cap - 1;
 
     init_color_tables();
-    
+
     /* Pick each pixel's best mix, then choose c0/c1 with the Bayer cell. */
     i = 0;
     for (y = 0; y < h; y++) {

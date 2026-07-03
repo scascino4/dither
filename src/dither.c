@@ -1,4 +1,5 @@
 #include <limits.h>
+#include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -14,63 +15,115 @@
 
 #include "cache.c"
 
-#define BAYER_N 4
+#define BAYER_N 8
 #define MIX_N (BAYER_N * BAYER_N)
 
-/* Ordered-dither threshold pattern. */
+/* Ordered-dither threshold pattern. 8x8 gives 65 mix levels. */
 static const unsigned char bayer[BAYER_N][BAYER_N] = {
-    { 0,  8,  2, 10},
-    {12,  4, 14,  6},
-    { 3, 11,  1,  9},
-    {15,  7, 13,  5}
+    { 0, 32,  8, 40,  2, 34, 10, 42},
+    {48, 16, 56, 24, 50, 18, 58, 26},
+    {12, 44,  4, 36, 14, 46,  6, 38},
+    {60, 28, 52, 20, 62, 30, 54, 22},
+    { 3, 35, 11, 43,  1, 33,  9, 41},
+    {51, 19, 59, 27, 49, 17, 57, 25},
+    {15, 47,  7, 39, 13, 45,  5, 37},
+    {63, 31, 55, 23, 61, 29, 53, 21}
 };
 
 static struct mix mixes[PAL_N * PAL_N * (MIX_N + 1)];
 static int nmix;
+static double lin[256];
+static double pal_lin[PAL_N][3];
 
-static void init_mixes(void)
+static double srgb_to_linear(unsigned char v)
 {
-    int c0, c1, m;
+    double c;
+
+    c = (double)v / 255.0;
+    if (c <= 0.04045)
+        return c / 12.92;
+    return pow((c + 0.055) / 1.055, 2.4);
+}
+
+static void oklab(double r, double g, double b,
+                  double *out_l, double *out_a, double *out_b)
+{
+    double lms_l, lms_m, lms_s;
+    double l, m, s;
+
+    lms_l = 0.4122214708 * r + 0.5363325363 * g + 0.0514459929 * b;
+    lms_m = 0.2119034982 * r + 0.6806995451 * g + 0.1073969566 * b;
+    lms_s = 0.0883024619 * r + 0.2817188376 * g + 0.6299787005 * b;
+
+    l = cbrt(lms_l);
+    m = cbrt(lms_m);
+    s = cbrt(lms_s);
+
+    *out_l = 0.2104542553 * l + 0.7936177850 * m - 0.0040720468 * s;
+    *out_a = 1.9779984951 * l - 2.4285922050 * m + 0.4505937099 * s;
+    *out_b = 0.0259040371 * l + 0.7827717662 * m - 0.8086757660 * s;
+}
+
+static void init_color_tables(void)
+{
+    int c0, c1, i, j, m;
+    double f, r, g, b;
     struct mix *x;
 
-    /* Precompute every palette-pair mixture in MIX_N-scaled RGB. */
+    for (i = 0; i < 256; i++)
+        lin[i] = srgb_to_linear((unsigned char)i);
+
+    for (i = 0; i < PAL_N; i++) {
+        for (j = 0; j < 3; j++)
+            pal_lin[i][j] = lin[pal[i][j]];
+    }
+
+    /* Precompute unordered palette-pair mixtures in linear light, then store OKLab. */
     nmix = 0;
     for (c0 = 0; c0 < PAL_N; c0++) {
-        for (c1 = 0; c1 < PAL_N; c1++) {
+        for (c1 = c0; c1 < PAL_N; c1++) {
             for (m = 0; m <= MIX_N; m++) {
+                f = (double)m / (double)MIX_N;
+                r = pal_lin[c0][0] * f + pal_lin[c1][0] * (1.0 - f);
+                g = pal_lin[c0][1] * f + pal_lin[c1][1] * (1.0 - f);
+                b = pal_lin[c0][2] * f + pal_lin[c1][2] * (1.0 - f);
+
                 x = mixes + nmix++;
                 x->c0 = (unsigned char)c0;
                 x->c1 = (unsigned char)c1;
                 x->m = (unsigned char)m;
-                x->r = pal[c0][0] * m + pal[c1][0] * (MIX_N - m);
-                x->g = pal[c0][1] * m + pal[c1][1] * (MIX_N - m);
-                x->b = pal[c0][2] * m + pal[c1][2] * (MIX_N - m);
+                oklab(r, g, b, &x->l, &x->a, &x->b);
             }
         }
     }
 }
 
+/*
+* Match colors in a more perceptual space than byte sRGB.  sRGB values are
+* gamma-encoded, so arithmetic on them does not correspond to physical light;
+* first convert to linear RGB before averaging palette colors.  Then compare
+* input colors and palette mixtures in OKLab, where Euclidean distance better
+* tracks perceived color difference than raw RGB distance.
+*/
 static void best(unsigned char r, unsigned char g, unsigned char b,
                  unsigned char *cc0, unsigned char *cc1, unsigned char *mm)
 {
-    long bd, d;
-    int i, dr, dg, db, rr, gg, bb;
+    double tl, ta, tb, dl, da, db, bd, d;
+    int i;
     struct mix *x, *bx;
 
-    rr = r * MIX_N;
-    gg = g * MIX_N;
-    bb = b * MIX_N;
+    oklab(lin[r], lin[g], lin[b], &tl, &ta, &tb);
 
-    bd = LONG_MAX;
+    bd = 1.0e30;
     bx = mixes;
 
-    /* Find the closest precomputed mixture by squared RGB distance. */
+    /* Find the closest precomputed mixture by squared OKLab distance. */
     for (i = 0; i < nmix; i++) {
         x = mixes + i;
-        dr = rr - x->r;
-        dg = gg - x->g;
-        db = bb - x->b;
-        d = (long)dr * dr + (long)dg * dg + (long)db * db;
+        dl = tl - x->l;
+        da = ta - x->a;
+        db = tb - x->b;
+        d = dl * dl + da * da + db * db;
         if (d < bd) {
             bd = d;
             bx = x;
@@ -95,6 +148,7 @@ static int ends_with(const char *s, const char *suffix)
 
     slen = strlen(s);
     suffix_len = strlen(suffix);
+
     if (suffix_len > slen)
         return 0;
 
@@ -151,9 +205,10 @@ int main(int argc, char **argv)
     }
     mask = cap - 1;
 
+    init_color_tables();
+    
     /* Pick each pixel's best mix, then choose c0/c1 with the Bayer cell. */
     i = 0;
-    init_mixes();
     for (y = 0; y < h; y++) {
         for (x = 0; x < w; x++, i++) {
             p = in + i * 3;

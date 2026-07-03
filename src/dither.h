@@ -3,7 +3,7 @@
 
 struct mix {
     unsigned char c0, c1, m;
-    int r, g, b;
+    double l, a, b;
 };
 
 struct result {

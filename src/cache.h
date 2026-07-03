@@ -6,7 +6,4 @@ struct entry {
     int used;
 };
 
-struct entry *lookup(struct entry *tab, unsigned long mask,
-                     unsigned long key, int *found);
-
 #endif

@@ -1,5 +1,3 @@
-#include "cache.h"
-
 /*
  * Knuth-style multiplicative hash for integer keys.
  */
@@ -10,8 +8,8 @@ static unsigned long hash(unsigned long x)
     return x;
 }
 
-struct entry *lookup(struct entry *tab, unsigned long mask,
-                     unsigned long key, int *found)
+static struct entry *lookup(struct entry *tab, unsigned long mask,
+                            unsigned long key, int *found)
 {
     struct entry *e;
     unsigned long i;

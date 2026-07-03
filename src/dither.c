@@ -11,6 +11,8 @@
 #include "dither.h"
 #include "palette.h"
 
+#include "cache.c"
+
 #define BAYER_N 4
 #define MIX_N (BAYER_N * BAYER_N)
 

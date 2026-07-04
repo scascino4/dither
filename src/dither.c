@@ -9,11 +9,11 @@
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "third-party/stb_image_write.h"
 
-#include "cache.h"
+#include "table.h"
 #include "dither.h"
 #include "palette.h"
 
-#include "cache.c"
+#include "table.c"
 
 #define BAYER_N 8
 #define MIX_N (BAYER_N * BAYER_N)
@@ -188,7 +188,7 @@ int main(int argc, char **argv)
         goto done;
     }
 
-    /* Allocate output pixels and a cache. */
+    /* Allocate output pixels and a lookup table. */
     npx = (size_t)w * (size_t)h;
     sz = npx * 3;
     out = (unsigned char *)malloc(sz);

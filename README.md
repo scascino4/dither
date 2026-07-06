@@ -1,7 +1,7 @@
 # dither
 
 <p align="center">
-  <img src="images/federer-dither.jpg" alt="Dithered Pieta" />
+  <img src="images/thinker-dither.jpg" alt="Dithered Pieta" />
 </p>
 
 `dither` is a small C command-line tool that converts an image to a 16-color VGA-style palette using

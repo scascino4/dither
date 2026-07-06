@@ -87,6 +87,7 @@ static void init_color_tables(void)
                 r = pal_lin[c0][0] * f + pal_lin[c1][0] * (1.0 - f);
                 g = pal_lin[c0][1] * f + pal_lin[c1][1] * (1.0 - f);
                 b = pal_lin[c0][2] * f + pal_lin[c1][2] * (1.0 - f);
+
                 x = mixes + nmix++;
                 x->c0 = (unsigned char)c0;
                 x->c1 = (unsigned char)c1;
@@ -150,6 +151,7 @@ static int ends_with(const char *s, const char *suffix)
 
     if (suffix_len > slen)
         return 0;
+    
     s += slen - suffix_len;
     while (*suffix) {
         if (lower((unsigned char)*s) != lower((unsigned char)*suffix))
